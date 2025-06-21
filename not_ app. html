@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Note Manager</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0; padding: 0;
+      background-color: white;
+      color: black;
+    }
+
+    .dark-mode {
+      background-color: #121212;
+      color: white;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: auto;
+      padding: 20px;
+    }
+
+    .hidden { display: none; }
+
+    input, textarea, select, button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      box-sizing: border-box;
+    }
+
+    .note {
+      border: 1px solid #ccc;
+      padding: 10px;
+      margin-top: 10px;
+    }
+
+    .note-buttons {
+      margin-top: 5px;
+      text-align: right;
+    }
+
+    .note-buttons button {
+      margin-left: 5px;
+    }
+
+    .category-list {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    #themeToggle {
+      width: auto;
+      padding: 5px 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container" id="loginScreen">
+    <h2>Enter Password</h2>
+    <input type="password" id="passwordInput" placeholder="Password">
+    <button onclick="checkPassword()">Submit</button>
+    <p id="passwordError" style="color:red;"></p>
+  </div>
+
+  <div class="container hidden" id="homeScreen">
+    <h2>Welcome to your personal note manager!</h2>
+    <button onclick="showMain()">Start Using App</button>
+  </div>
+
+  <div class="container hidden" id="mainApp">
+    <div class="top-bar">
+      <select id="categorySelect"></select>
+      <button id="themeToggle" onclick="toggleTheme()">🌞</button>
+    </div>
+    <input type="text" id="searchInput" placeholder="Search notes..." oninput="updateNotes()">
+    <textarea id="noteInput" placeholder="Write your note here"></textarea>
+    <button onclick="saveNote()">Save Note</button>
+    <button onclick="clearNotes()">Clear All Notes (This Category)</button>
+
+    <div class="category-list">
+      <input type="text" id="newCategoryInput" placeholder="New Category">
+      <button onclick="addCategory()">Add</button>
+    </div>
+
+    <div id="notesContainer"></div>
+  </div>
+
+  <script>
+    const correctPassword = "1234";
+    let notes = JSON.parse(localStorage.getItem("notes") || "[]");
+    let categories = JSON.parse(localStorage.getItem("categories") || '["General"]');
+    let currentCategory = "General";
+    let editingIndex = null;
+    let isDarkMode = false;
+
+    const passwordInput = document.getElementById("passwordInput");
+    const passwordError = document.getElementById("passwordError");
+    const loginScreen = document.getElementById("loginScreen");
+    const homeScreen = document.getElementById("homeScreen");
+    const mainApp = document.getElementById("mainApp");
+    const categorySelect = document.getElementById("categorySelect");
+    const noteInput = document.getElementById("noteInput");
+    const notesContainer = document.getElementById("notesContainer");
+    const searchInput = document.getElementById("searchInput");
+
+    function checkPassword() {
+      if (passwordInput.value === correctPassword) {
+        loginScreen.classList.add("hidden");
+        homeScreen.classList.remove("hidden");
+      } else {
+        passwordError.textContent = "Incorrect password!";
+      }
+    }
+
+    function showMain() {
+      homeScreen.classList.add("hidden");
+      mainApp.classList.remove("hidden");
+      loadCategories();
+      updateNotes();
+    }
+
+    function loadCategories() {
+      categorySelect.innerHTML = "";
+      categories.forEach(cat => {
+        const opt = document.createElement("option");
+        opt.value = cat;
+        opt.textContent = cat;
+        categorySelect.appendChild(opt);
+      });
+      categorySelect.value = currentCategory;
+      categorySelect.onchange = () => {
+        currentCategory = categorySelect.value;
+        updateNotes();
+      };
+    }
+
+    function addCategory() {
+      const newCat = document.getElementById("newCategoryInput").value.trim();
+      if (newCat && !categories.includes(newCat)) {
+        categories.push(newCat);
+        saveCategories();
+        loadCategories();
+        categorySelect.value = newCat;
+        currentCategory = newCat;
+        document.getElementById("newCategoryInput").value = "";
+        updateNotes();
+      }
+    }
+
+    function saveCategories() {
+      localStorage.setItem("categories", JSON.stringify(categories));
+    }
+
+    function saveNote() {
+      const text = noteInput.value.trim();
+      if (!text) return;
+      const time = new Date().toLocaleString();
+      const note = `${text} (Saved on: ${time})`;
+      if (editingIndex !== null) {
+        notes[editingIndex] = [currentCategory, note];
+        editingIndex = null;
+      } else {
+        notes.push([currentCategory, note]);
+      }
+      localStorage.setItem("notes", JSON.stringify(notes));
+      noteInput.value = "";
+      updateNotes();
+    }
+
+    function updateNotes() {
+      notesContainer.innerHTML = "";
+      const filter = searchInput.value.toLowerCase();
+      notes.forEach((n, idx) => {
+        const [cat, text] = n;
+        if (cat === currentCategory && text.toLowerCase().includes(filter)) {
+          const div = document.createElement("div");
+          div.className = "note";
+          div.innerHTML = `<div>${text}</div>
+          <div class="note-buttons">
+            <button onclick="editNote(${idx})">Edit</button>
+            <button onclick="removeNote(${idx})">Remove</button>
+          </div>`;
+          notesContainer.appendChild(div);
+        }
+      });
+    }
+
+    function editNote(index) {
+      const [cat, text] = notes[index];
+      noteInput.value = text.split(" (Saved on:")[0];
+      editingIndex = index;
+    }
+
+    function removeNote(index) {
+      notes.splice(index, 1);
+      localStorage.setItem("notes", JSON.stringify(notes));
+      updateNotes();
+    }
+
+    function clearNotes() {
+      notes = notes.filter(n => n[0] !== currentCategory);
+      localStorage.setItem("notes", JSON.stringify(notes));
+      updateNotes();
+    }
+
+    function toggleTheme() {
+      isDarkMode = !isDarkMode;
+      document.body.classList.toggle("dark-mode", isDarkMode);
+      document.getElementById("themeToggle").textContent = isDarkMode ? "🌙" : "🌞";
+    }
+  </script>
+</body>
+</html>
